@@ -6,6 +6,7 @@ using Hangfire;
 using Hangfire.SqlServer;
 using System.Configuration;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Blog.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +31,9 @@ builder.Services.AddControllers(option => {
 });
 builder.Services.AddScoped<IAIBlogPostGenerator, AIBlogPostGenerator>();
 builder.Services.AddScoped<IJwtToken, JwtToken>();
+builder.Services.AddScoped<BlogPostRepository>();
+builder.Services.AddScoped<CommentRepository>();
+builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<PostEventProducer>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

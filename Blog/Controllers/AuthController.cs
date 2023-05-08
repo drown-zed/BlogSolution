@@ -1,5 +1,6 @@
 ﻿using Blog.DTO.Input;
 using Blog.Models;
+using Blog.Repositories;
 using Blog.Services;
 using CryptSharp;
 using Microsoft.AspNetCore.Mvc;
@@ -12,13 +13,13 @@ namespace Blog.Controllers
     public class AuthController : ControllerBase
     {
         private IConfiguration _configuration;
-        private DatabaseContext _context;
         private IJwtToken _jwtToken;
+        private UserRepository _userRepository;
 
-        public AuthController(IConfiguration configuration, DatabaseContext context, IJwtToken jwtToken)
+        public AuthController(IConfiguration configuration, UserRepository userRepository, IJwtToken jwtToken)
         {
             _configuration = configuration;
-            _context = context;
+            _userRepository = userRepository;
             _jwtToken = jwtToken;
         }
 
@@ -27,8 +28,7 @@ namespace Blog.Controllers
         {
             var hash = CreatePasswordHash(user.Password);
             user.Password = hash;
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            await _userRepository.CreateAsync(user);
 
             return Ok();
         }
@@ -40,7 +40,7 @@ namespace Blog.Controllers
             var hash = CreatePasswordHash(request.Password);
 
 
-            User? user = await _context.Users.SingleOrDefaultAsync(x => x.Nickname == request.Username);
+            User? user = await _userRepository.FindSingleByNicknameAsync(request.Username);
 
             if (user == null)
             {

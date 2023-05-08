@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Blog.Models;
 using Blog.Services;
+using Blog.Repositories;
 
 namespace Blog.Controllers
 {
@@ -14,12 +15,12 @@ namespace Blog.Controllers
     [ApiController]
     public class CommentsController : ControllerBase
     {
-        private readonly DatabaseContext _context;
+        private CommentRepository _commentRepository;
         private readonly IJwtToken _jwtToken;
 
-        public CommentsController(DatabaseContext context, IJwtToken jwtToken)
+        public CommentsController(CommentRepository commentRepository, IJwtToken jwtToken)
         {
-            _context = context;
+            _commentRepository = commentRepository;
             _jwtToken = jwtToken;
         }
 
@@ -27,14 +28,14 @@ namespace Blog.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Comment>>> GetComments()
         {
-            return await _context.Comments.ToListAsync();
+            return await _commentRepository.GetAll();
         }
 
         // GET: api/Comments/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Comment>> GetComment(int id)
         {
-            var comment = await _context.Comments.FindAsync(id);
+            var comment = await _commentRepository.GetById(id);
 
             if (comment == null)
             {
@@ -61,15 +62,14 @@ namespace Blog.Controllers
 
             comment.UserId = _jwtToken.GetUserIdFromToken(authToken);
 
-            _context.Entry(comment).State = EntityState.Modified;
 
             try
             {
-                await _context.SaveChangesAsync();
+                await _commentRepository.Update(comment);
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!CommentExists(id))
+                if (!_commentRepository.Exists(id))
                 {
                     return NotFound();
                 }
@@ -94,8 +94,7 @@ namespace Blog.Controllers
 
             comment.UserId = _jwtToken.GetUserIdFromToken(authToken);
 
-            _context.Comments.Add(comment);
-            await _context.SaveChangesAsync();
+            await _commentRepository.CreateAsync(comment);
 
             return CreatedAtAction("GetComment", new { id = comment.Id }, comment);
         }
@@ -109,21 +108,15 @@ namespace Blog.Controllers
                 return BadRequest("Permission dennied");
             }
 
-            var comment = await _context.Comments.FindAsync(id);
+            var comment = await _commentRepository.GetById(id);
             if (comment == null)
             {
                 return NotFound();
             }
 
-            _context.Comments.Remove(comment);
-            await _context.SaveChangesAsync();
+            await _commentRepository.DeleteAsync(comment);
 
             return NoContent();
-        }
-
-        private bool CommentExists(int id)
-        {
-            return _context.Comments.Any(e => e.Id == id);
         }
     }
 }

@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Blog.Models;
 using Blog.Services;
+using Blog.Repositories;
 
 namespace Blog.Controllers
 {
@@ -9,13 +10,14 @@ namespace Blog.Controllers
     [ApiController]
     public class BlogPostsController : ControllerBase
     {
-        private readonly DatabaseContext _context;
+
+        private readonly BlogPostRepository _blogPostRepository;
         private readonly IJwtToken _jwtToken;
         private readonly PostEventProducer _producer;
 
-        public BlogPostsController(DatabaseContext context, IJwtToken jwtToken, PostEventProducer producer)
+        public BlogPostsController(BlogPostRepository blogPostRepository, IJwtToken jwtToken, PostEventProducer producer)
         {
-            _context = context;
+            _blogPostRepository = blogPostRepository;
             _jwtToken = jwtToken;
             _producer = producer;
         }
@@ -23,15 +25,15 @@ namespace Blog.Controllers
         // GET: api/BlogPosts
         [HttpGet]
         public async Task<ActionResult<IEnumerable<BlogPost>>> GetBlogPosts()
-        {   
-            return await _context.BlogPosts.Include(post => post.User).ToListAsync();
+        {
+            return await _blogPostRepository.GetAllWithUsers();
         }
 
         // GET: api/BlogPosts/5
         [HttpGet("{id}")]
         public async Task<ActionResult<BlogPost>> GetBlogPost(int id)
         {
-            var blogPost = await _context.BlogPosts.Include(post => post.User).Where(post => post.Id == id).FirstAsync();
+            var blogPost = await _blogPostRepository.GetByIdWithUser(id);
 
             if (blogPost == null)
             {
@@ -57,15 +59,13 @@ namespace Blog.Controllers
             }
             blogPost.UserId = _jwtToken.GetUserIdFromToken(authToken);
 
-            _context.Entry(blogPost).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                await _blogPostRepository.Update(blogPost);
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!BlogPostExists(id))
+                if (!_blogPostRepository.Exists(id))
                 {
                     return NotFound();
                 }
@@ -89,8 +89,7 @@ namespace Blog.Controllers
             }
             blogPost.UserId = _jwtToken.GetUserIdFromToken(authToken);
 
-            _context.BlogPosts.Add(blogPost);
-            _context.SaveChanges();
+            await _blogPostRepository.CreateAsync(blogPost);
 
             _producer.sendPostCreated($"https://localhost:44338/api/blog-posts/{blogPost.Id}");
 
@@ -106,21 +105,16 @@ namespace Blog.Controllers
                 return BadRequest("Permission dennied");
             }
 
-            var blogPost = await _context.BlogPosts.FindAsync(id);
+            var blogPost = await _blogPostRepository.GetById(id);
+
             if (blogPost == null)
             {
                 return NotFound();
             }
 
-            _context.BlogPosts.Remove(blogPost);
-            await _context.SaveChangesAsync();
+            await _blogPostRepository.DeleteAsync(blogPost);
 
             return NoContent();
-        }
-
-        private bool BlogPostExists(int id)
-        {
-            return _context.BlogPosts.Any(e => e.Id == id);
         }
     }
 }

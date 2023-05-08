@@ -4,18 +4,19 @@ using Blog.Models;
 using Hangfire;
 using Blog.DTO.Output;
 using Blog.DTO.Input;
+using Blog.Repositories;
 
 namespace Blog.Services
 {
     public class AIBlogPostGenerator : IAIBlogPostGenerator
     {
-        private static DatabaseContext? _context;
+        private static BlogPostRepository? _blogPostRepository;
         private IBackgroundJobClient _client;
         private IConfiguration _configuration;
         private PostEventProducer _producer;
-        public AIBlogPostGenerator(DatabaseContext context, IBackgroundJobClient client, IConfiguration configuration, PostEventProducer producer)
+        public AIBlogPostGenerator(BlogPostRepository blogPostRepository, IBackgroundJobClient client, IConfiguration configuration, PostEventProducer producer)
         {
-            _context = context;
+            _blogPostRepository = blogPostRepository;
             _client = client;
             _configuration = configuration;
             _producer = producer;
@@ -45,14 +46,13 @@ namespace Blog.Services
             blogPost.Title = title;
             blogPost.Body = aiResponse.Choices[0].Text ?? "";
             blogPost.UserId = userId;
-            if (_context == null)
+            if (_blogPostRepository == null)
             {
                 throw new Exception("Context is null, wrong database configuration?");
             }
-            _context.BlogPosts.Add(blogPost);
+            await _blogPostRepository.CreateAsync(blogPost);
             _producer.sendPostCreated($"https://localhost:44338/api/blog-posts/{blogPost.Id}");
-
-            await _context.SaveChangesAsync();
+            
         }
 
         private static StringContent createRequestContent(string title)

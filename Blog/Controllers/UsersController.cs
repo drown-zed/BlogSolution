@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Blog.Models;
 using Blog.Services;
+using Blog.Repositories;
 
 namespace Blog.Controllers
 {
@@ -14,12 +15,12 @@ namespace Blog.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly DatabaseContext _context;
+        private readonly UserRepository _userRepository;
         private readonly IJwtToken _jwtToken;
 
-        public UsersController(DatabaseContext context, IJwtToken jwtToken)
+        public UsersController(UserRepository userRepository, IJwtToken jwtToken)
         {
-            _context = context;
+            _userRepository = userRepository;
             _jwtToken = jwtToken;
         }
 
@@ -27,14 +28,14 @@ namespace Blog.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<User>>> GetUsers()
         {
-            return await _context.Users.ToListAsync();
+            return await _userRepository.GetAll();
         }
 
         // GET: api/Users/5
         [HttpGet("{id}")]
         public async Task<ActionResult<User>> GetUser(int id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await _userRepository.GetById(id);
 
             if (user == null)
             {
@@ -54,15 +55,13 @@ namespace Blog.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(user).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                await _userRepository.Update(user);
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!UserExists(id))
+                if (!_userRepository.Exists(id))
                 {
                     return NotFound();
                 }
@@ -79,21 +78,15 @@ namespace Blog.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser([FromHeader(Name = "Auth-Token")] string authToken, int id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await _userRepository.GetById(id);
             if (user == null)
             {
                 return NotFound();
             }
 
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
+            await _userRepository.DeleteAsync(user);
 
             return NoContent();
-        }
-
-        private bool UserExists(int id)
-        {
-            return _context.Users.Any(e => e.Id == id);
         }
     }
 }
